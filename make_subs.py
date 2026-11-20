@@ -1,6 +1,6 @@
 from faster_whisper import WhisperModel
 import sys
-model = WhisperModel("tiny", device="cpu", compute_type="int8")
+model = WhisperModel("base", device="cpu", compute_type="int8")
 segments, info = model.transcribe(sys.argv[1], word_timestamps=True)
 def ts(sec):
     h = int(sec//3600); m = int(sec%3600//60); s = int(sec%60); cs = int((sec-int(sec))*100)
@@ -11,7 +11,7 @@ PlayResX: 1080
 PlayResY: 1920
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Def,Liberation Sans,58,&H00FFFFFF,&H00000000,&H80000000,-1,4,1,2,60,60,400,1
+Style: Def,Liberation Sans,54,&H00FFFFFF,&H00000000,&H80000000,-1,4,2,2,70,70,260,1
 [Events]
 Format: Layer, Start, End, Style, Text
 """
