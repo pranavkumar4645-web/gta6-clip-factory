@@ -15,6 +15,7 @@ Style: Def,Liberation Sans,58,&H00FFFFFF,&H00000000,&H80000000,-1,4,1,2,60,60,40
 [Events]
 Format: Layer, Start, End, Style, Text
 """
+NL = chr(10)
 lines = [header]
 for seg in segments:
     words = seg.words or []
@@ -25,12 +26,9 @@ for seg in segments:
             start = w.start
         chunk.append(w.word.strip())
         if len(chunk) >= 3 or (w.word.strip().endswith(('.', '!', '?'))):
-            lines.append(f"Dialogue: 0,{ts(start)},{ts(w.end)},Def," + " ".join(chunk).replace(",", " ").replace("
-", " "))
+            lines.append("Dialogue: 0," + ts(start) + "," + ts(w.end) + ",Def," + " ".join(chunk).replace(",", " ").replace(NL, " "))
             chunk = []
     if chunk:
-        lines.append(f"Dialogue: 0,{ts(start)},{ts(seg.end)},Def," + " ".join(chunk).replace(",", " ").replace("
-", " "))
-open("subs.ass", "w").write("
-".join(lines))
+        lines.append("Dialogue: 0," + ts(start) + "," + ts(seg.end) + ",Def," + " ".join(chunk).replace(",", " ").replace(NL, " "))
+open("subs.ass", "w").write(NL.join(lines))
 print("subs written")
