@@ -1,0 +1,43 @@
+---
+name: Render GTA 6 clip
+on:
+  workflow_dispatch:
+    inputs:
+      clip_url:
+        description: Twitch clip URL
+        required: true
+      title:
+        description: Caption text
+        required: false
+        default: ''
+      credit:
+        description: Streamer credit
+        required: false
+        default: ''
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-liberation
+          pip install -q faster-whisper yt-dlp
+      - name: Render
+        env:
+          CLIP_URL: ${{ inputs.clip_url }}
+          TITLE: ${{ inputs.title }}
+          CREDIT: ${{ inputs.credit }}
+        run: bash render.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "clip-${GITHUB_RUN_ID}" out.mp4 --title "clip-${GITHUB_RUN_ID}" --notes "auto render" || echo "release step failed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rendered-clip
+          path: out.mp4
