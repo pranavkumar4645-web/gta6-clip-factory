@@ -1,0 +1,96 @@
+name: Auto clip (scout + render + webhook)
+on:
+  schedule:
+    - cron: "17 5,8,11,14 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  auto-clip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TWITCH_CLIENT_ID: dyys9anz9uaayb45wnld000ne5l7bm
+      TWITCH_SECRET: yr0m6ju2yu597ep4lxp3w4jx4bvly7
+      WEBHOOK_URL: https://cloud.activepieces.com/api/v1/webhooks/GKLser6YYAfdi6dtczbOs
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: pranavkumar4645-web/gta6-clip-factory
+    steps:
+      - name: Scout Twitch clips
+        run: |
+          set -uo pipefail
+          TOKEN=$(curl -s -X POST "https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_SECRET}&grant_type=client_credentials" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+          curl -s -H "Client-Id: ${TWITCH_CLIENT_ID}" -H "Authorization: Bearer ${TOKEN}" "https://api.twitch.tv/helix/clips?game_id=1867279146&first=30" > clips.json
+          gh release list --limit 200 --json tagName > tags.json 2>/dev/null || echo '[]' > tags.json
+          python3 - <<'EOF'
+          import json, re, sys, os
+          clips = json.load(open('clips.json')).get('data', [])
+          done = {t.get('tagName','') for t in json.load(open('tags.json'))}
+          BL = re.compile(r'nude|naked|nsfw|porn|sex|sexy|sexual|strip|onlyfans|horny|erotic|gore|beheading|decapitat', re.I)
+          EMOJI = re.compile('[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\U00002190-\U000021FF\U00002B00-\U00002BFF\U0000FE00-\U0000FE0F]')
+          cands = []
+          for c in clips:
+              if f"clip-{c['id']}" in done:
+                  continue
+              if BL.search(c.get('title') or '') or BL.search(c.get('broadcaster_name') or ''):
+                  continue
+              d = c.get('duration') or 0
+              if d < 15 or d > 180:
+                  continue
+              cands.append(c)
+          if not cands:
+              print("::error::no suitable clip")
+              sys.exit(1)
+          best = max(cands, key=lambda c: c.get('view_count', 0))
+          title = re.sub(r'#\w+', '', best.get('title') or '')
+          title = EMOJI.sub('', title)
+          title = BL.sub('', title)
+          title = re.sub(r'\s+', ' ', title).strip().strip('|:-–— ')
+          title = title[:60].strip()
+          if not title:
+              title = 'GTA 6 funny moment'
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f"CLIP_ID={best['id']}\n")
+              env.write(f"CLIP_URL={best['url']}\n")
+              env.write(f"TITLE={title}\n")
+              env.write(f"CREDIT=@{best['broadcaster_name']}\n")
+          print(f"Picked clip {best['id']} '{title}' views={best.get('view_count')} by {best['broadcaster_name']}")
+          EOF
+      - uses: actions/checkout@v4
+        if: env.CLIP_ID != ''
+      - uses: actions/setup-python@v5
+        if: env.CLIP_ID != ''
+        with:
+          python-version: '3.11'
+      - name: Install tools
+        if: env.CLIP_ID != ''
+        run: |
+          which ffmpeg || sudo apt-get install -y -qq ffmpeg
+          sudo apt-get install -y -qq fonts-liberation
+          pip install -q faster-whisper yt-dlp
+      - name: Render
+        if: env.CLIP_ID != ''
+        run: |
+          export CLIP_URL="https://clips.twitch.tv/${CLIP_ID}"
+          bash render.sh
+      - name: Publish release
+        id: release
+        if: env.CLIP_ID != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "clip-${CLIP_ID}" out.mp4 frame.jpg --title "clip-${CLIP_ID}" --notes "TITLE: ${TITLE} | CREDIT: ${CREDIT}" --target main
+      - name: Notify webhook
+        if: env.CLIP_ID != '' && steps.release.outcome == 'success'
+        run: |
+          python3 - <<'EOF' > payload.json
+          import json, os
+          print(json.dumps({
+              "videoUrl": "https://github.com/pranavkumar4645-web/gta6-clip-factory/releases/download/clip-%s/out.mp4" % os.environ["CLIP_ID"],
+              "title": os.environ["TITLE"],
+              "credit": os.environ["CREDIT"],
+              "releaseTag": "clip-%s" % os.environ["CLIP_ID"],
+          }))
+          EOF
+          cat payload.json
+          curl -s -X POST "${WEBHOOK_URL}" -H "Content-Type: application/json" --data @payload.json
