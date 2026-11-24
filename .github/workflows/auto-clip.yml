@@ -41,7 +41,7 @@ jobs:
           title = re.sub(r'#\w+', '', c.get('title') or '')
           title = EMOJI.sub('', title)
           title = BL.sub('', title)
-          title = re.sub(r'\s+', ' ', title).strip().strip('|:-\u2013\u2014 '));
+          title = re.sub(r'\s+', ' ', title).strip().strip('|:-\u2013\u2014 ');
           title = title[:60].strip() or 'GTA 6 funny moment'
           cands.append({'id': cid, 'title': title, 'credit': '@' + c['broadcaster_name'], 'views': c.get('view_count', 0)})
           cands.sort(key=lambda x: -x['views'])
