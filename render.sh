@@ -17,6 +17,11 @@ if [ -f transcript.txt ] && [ "$(cat transcript.txt)" != "0" ] && [ ! -s subs.as
   echo "REJECTED: speech detected but captions missing"
   exit 4
 fi
+# visual frame gate: skin-pixel analysis of the raw clip (1 fps), runs after transcript screen
+if [ -f "$(dirname "$0")/vision_check.py" ]; then
+  python3 "$(dirname "$0")/vision_check.py" source.mp4 || exit 7
+fi
+
 # fonts: modern display font for the title
 curl -sL -o Anton.ttf "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf" || true
 TITLEFONT="Anton.ttf"
@@ -34,5 +39,10 @@ if [ ! -s out.mp4 ]; then echo "REJECTED: render failed"; exit 5; fi
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out.mp4 || echo 0)
 SIZE=$(stat -c%s out.mp4 || echo 0)
 if [ "${DUR%.*}" -lt 3 ] || [ "$SIZE" -lt 200000 ]; then echo "REJECTED: render too short or tiny"; exit 6; fi
+# final QC: re-run the visual gate on the rendered video before release
+if [ -f "$(dirname "$0")/vision_check.py" ]; then
+  python3 "$(dirname "$0")/vision_check.py" out.mp4 || { echo "REJECTED: final video failed visual QC"; exit 7; }
+fi
+
 ffmpeg -y -ss $(awk "BEGIN{print int($DUR/2)}") -i out.mp4 -frames:v 1 -q:v 2 frame.jpg || echo "thumb skipped"
 ls -la out.mp4 frame.jpg
