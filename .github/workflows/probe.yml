@@ -1,4 +1,4 @@
-name: probe
+name: Render GTA 6 clip
 on:
   workflow_dispatch:
     inputs:
@@ -14,7 +14,30 @@ on:
         required: false
         default: 'none'
 jobs:
-  ok:
+  render:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - run: echo hello
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tools
+        run: |
+          which ffmpeg || sudo apt-get install -y -qq ffmpeg
+          sudo apt-get install -y -qq fonts-liberation
+          pip install -q faster-whisper yt-dlp
+      - name: Render
+        env:
+          CLIP_URL: ${{ inputs.clip_url }}
+          TITLE: ${{ inputs.title }}
+          CREDIT: ${{ inputs.credit }}
+        run: bash render.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "clip-${GITHUB_RUN_ID}" out.mp4 frame.jpg --title "clip-${GITHUB_RUN_ID}" --notes "TITLE: ${TITLE} | CREDIT: ${CREDIT}" --target main || echo "release step failed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rendered-clip
+          path: out.mp4
