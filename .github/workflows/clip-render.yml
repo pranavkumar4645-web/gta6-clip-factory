@@ -39,7 +39,8 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "clip-${GITHUB_RUN_ID}" out.mp4 frame.jpg --title "clip-${GITHUB_RUN_ID}" --notes "TITLE: ${TITLE} | CREDIT: ${CREDIT}" --target main || echo "release step failed"
+        run: |
+          gh release create "clip-${GITHUB_RUN_ID}" out.mp4 frame.jpg --title "clip-${GITHUB_RUN_ID}" --notes "TITLE: ${TITLE} | CREDIT: ${CREDIT}" --target main || echo "release step failed"
       - uses: actions/upload-artifact@v4
         with:
           name: rendered-clip
