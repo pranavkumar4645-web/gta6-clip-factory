@@ -81,7 +81,7 @@ jobs:
               if r.returncode == 0 and os.path.exists('source.mp4') and os.path.getsize('source.mp4') > 0:
                   lines = ['CLIP_ID=' + c['id'], 'TITLE=' + c['title'], 'CREDIT=' + c['credit']]
                   with open('chosen.env','w') as f:
-                      f.write(chr(10).join('CLIP_ID=' + shlex.quote(c['id']), 'TITLE=' + shlex.quote(c['title']), 'CREDIT=' + shlex.quote(c['credit'])))
+                      f.write(chr(10).join(['CLIP_ID=' + shlex.quote(c['id']), 'TITLE=' + shlex.quote(c['title']), 'CREDIT=' + shlex.quote(c['credit'])]))
                   with open(os.environ['GITHUB_ENV'],'a') as f:
                       for l in lines:
                           f.write(l + chr(10))
