@@ -20,6 +20,10 @@ jobs:
   render:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      CLIP_URL: ${{ inputs.clip_url }}
+      TITLE: ${{ inputs.title }}
+      CREDIT: ${{ inputs.credit }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,10 +35,6 @@ jobs:
           sudo apt-get install -y -qq fonts-liberation
           pip install -q faster-whisper yt-dlp
       - name: Render
-        env:
-          CLIP_URL: ${{ inputs.clip_url }}
-          TITLE: ${{ inputs.title }}
-          CREDIT: ${{ inputs.credit }}
         run: bash render.sh
       - name: Publish release
         env:
