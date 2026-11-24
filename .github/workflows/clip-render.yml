@@ -1,3 +1,4 @@
+---
 name: Render GTA 6 clip
 on:
   workflow_dispatch:
@@ -8,11 +9,11 @@ on:
       title:
         description: Caption text
         required: false
-        default: ''
+        default: 'none'
       credit:
         description: Streamer credit
         required: false
-        default: ''
+        default: 'none'
 permissions:
   contents: write
 jobs:
