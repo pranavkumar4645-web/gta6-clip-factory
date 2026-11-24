@@ -3,7 +3,7 @@ set -uo pipefail
 yt-dlp -o source.mp4 "$CLIP_URL"
 python3 make_subs.py source.mp4 || echo "subs skipped"
 # content safety screen: reject on explicit content in TITLE or actual spoken transcript
-BADWORDS='nude|naked|nsfw|porn|sex|sexy|sexual|18\+|xxx|erotic|orgy|threesom|blowjob|handjob|boob|tits?|titties|ass|butt|ass cheeks|onlyfans|horny|strip|stripper|pole danc|lap danc|lapdance|pole|mandy|lulu|brothel|prostitut|escort|kinky|fetish|bdsm|lingerie|panties|thong|topless|topless|shower scene|uncensor|hot scene|leaked scene|scene leak|gore|behead|decapitat|mutilat|disembowel|suicide|kill myself|self harm|school shooting|shooting up|terrorist|bomb making|slur|n-word|fag|retard|nsfl|pornhub|orgasm|dick|cock|nipples|nipple|asshole|fucked|fucking|fuck|shit|bitch|corpse|strip club|pole dance|lap dance|brothel|private dance'
+BADWORDS='nude|naked|nsfw|porn|sex|sexy|sexual|18\+|xxx|erotic|orgy|threesom|blowjob|handjob|boob|tits?|titties|ass|butt|ass cheeks|onlyfans|horny|strip|stripper|pole danc|lap danc|lapdance|pole|mandy|lulu|brothel|prostitut|escort|kinky|fetish|bdsm|lingerie|panties|thong|topless|topless|shower scene|uncensor|hot scene|leaked scene|scene leak|gore|behead|decapitat|mutilat|disembowel|suicide|kill myself|self harm|school shooting|shooting up|terrorist|bomb making|slur|n-word|fag|retard|nsfl|pornhub|orgasm|dick|cock|nipples|nipple|asshole|fucked|fucking|fuck|shit|bitch|corpse|strip club|pole dance|lap dance|brothel|private dance|gyatt|gyat|thicc|baddie|bbl|backshots|twerk|twerking|milf|dilf|zaddy|cougar|cakez|big cake'
 UNSAFE=0
 if printf "%s" "$TITLE" | grep -qiE "$BADWORDS"; then UNSAFE=1; fi
 if [ -f subs.ass ] && grep -qiE "$BADWORDS" subs.ass; then UNSAFE=1; fi
