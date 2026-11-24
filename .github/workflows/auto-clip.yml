@@ -42,10 +42,11 @@ jobs:
           title = EMOJI.sub('', title)
           title = BL.sub('', title)
           title = re.sub(r'\s+', ' ', title).strip().strip('|:-\u2013\u2014 ');
-          title = title[:60].strip() or 'GTA 6 funny moment'
+          if not re.search('[A-Za-z]', title):
+              title = 'GTA 6 funny moment'
           cands.append({'id': cid, 'title': title, 'credit': '@' + c['broadcaster_name'], 'views': c.get('view_count', 0)})
           cands.sort(key=lambda x: -x['views'])
-          top = cands[:5]
+          top = cands[:8]
           if not top:
               print('::error::no suitable clip')
               sys.exit(1)
@@ -72,26 +73,34 @@ jobs:
         if: env.CANDIDATES != ''
         run: |
           python3 - <<'EOF'
-          import json, os, shlex, subprocess, sys
+          python3 - <<'EOF'
+          import json, os, re, shlex, subprocess, sys
           cands = json.loads(os.environ['CANDIDATES'])
           for c in cands:
-              if os.path.exists('source.mp4'):
-                  os.remove('source.mp4')
+              for f in ['source.mp4','subs.ass','transcript.txt','out.mp4','frame.jpg']:
+                  if os.path.exists(f):
+                      os.remove(f)
               r = subprocess.run(['yt-dlp','-o','source.mp4','https://clips.twitch.tv/' + c['id']])
-              if r.returncode == 0 and os.path.exists('source.mp4') and os.path.getsize('source.mp4') > 0:
-                  lines = ['CLIP_ID=' + c['id'], 'TITLE=' + c['title'], 'CREDIT=' + c['credit']]
+              if r.returncode != 0 or not os.path.exists('source.mp4') or os.path.getsize('source.mp4') == 0:
+                  print('skip (download failed):', c['id'])
+                  continue
+              env = dict(os.environ, CLIP_URL='https://clips.twitch.tv/' + c['id'], TITLE=c['title'], CREDIT=c['credit'])
+              r = subprocess.run(['bash','render.sh'], env=env)
+              if r.returncode == 0 and os.path.exists('out.mp4') and os.path.getsize('out.mp4') > 0:
+                  raw = ['CLIP_ID=' + c['id'], 'TITLE=' + c['title'], 'CREDIT=' + c['credit']]
+                  quoted = ['CLIP_ID=' + shlex.quote(c['id']), 'TITLE=' + shlex.quote(c['title']), 'CREDIT=' + shlex.quote(c['credit'])]
                   with open('chosen.env','w') as f:
-                      f.write(chr(10).join(['CLIP_ID=' + shlex.quote(c['id']), 'TITLE=' + shlex.quote(c['title']), 'CREDIT=' + shlex.quote(c['credit'])]))
+                      f.write(chr(10).join(quoted))
                   with open(os.environ['GITHUB_ENV'],'a') as f:
-                      for l in lines:
+                      for l in raw:
                           f.write(l + chr(10))
                   print('Chosen clip', c['id'], '|', c['title'], '|', c['credit'])
                   sys.exit(0)
-          print('::error::no downloadable clip')
+              print('skip (render rejected, exit', r.returncode, '):', c['id'])
+          print('::error::no downloadable or safe clip')
           sys.exit(1)
           EOF
           source chosen.env
-          export CLIP_URL="https://clips.twitch.tv/${CLIP_ID}"
           bash render.sh
       - name: Publish release
         id: release
