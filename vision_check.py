@@ -76,6 +76,79 @@ def rule_fractions(img):
     return {'D': d / t, 'Y': y / t, 'H': h / t, 'N': n / t, 'YH': yh / t}
 
 
+def frame_features(img):
+    """Spatial features per frame: darkness, largest connected skin blob,
+    central-region skin, blob vertical position (0=top,1=bottom)."""
+    im = img.convert('RGB')
+    w, h = im.size
+    px = list(im.getdata())
+    tot = w * h
+    skin = [False] * tot
+    dark = 0
+    for p in range(tot):
+        r, g, b = px[p]
+        mx = max(r, g, b); mn = min(r, g, b)
+        if mx / 255.0 < 0.25:
+            dark += 1
+        cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b
+        cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
+        yb = (77 <= cb <= 127) and (133 <= cr <= 173)
+        v = mx / 255.0
+        s = 0.0 if mx == 0 else (mx - mn) / float(mx)
+        hsv = False
+        if v > 0.15 and 0.1 <= s <= 0.75:
+            if mx != mn:
+                if mx == r:
+                    hue = 60.0 * (((g - b) / float(mx - mn)) % 6)
+                elif mx == g:
+                    hue = 60.0 * ((b - r) / float(mx - mn) + 2)
+                else:
+                    hue = 60.0 * ((r - g) / float(mx - mn) + 4)
+            else:
+                hue = 0.0
+            if hue <= 50 or hue >= 340:
+                hsv = True
+        skin[p] = yb or hsv
+    # largest 8-connected component
+    seen = [False] * tot
+    best = 0
+    best_rows = None
+    stack = []
+    for p0 in range(tot):
+        if skin[p0] and not seen[p0]:
+            stack = [p0]
+            seen[p0] = True
+            size = 0
+            rmin = w + h; rmax = -1
+            while stack:
+                c = stack.pop()
+                size += 1
+                cx = c % w
+                cy = c // w
+                if cy < rmin: rmin = cy
+                if cy > rmax: rmax = cy
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)):
+                    nx = cx + dx; ny = cy + dy
+                    if 0 <= nx < w and 0 <= ny < h:
+                        np_ = ny * w + nx
+                        if skin[np_] and not seen[np_]:
+                            seen[np_] = True
+                            stack.append(np_)
+            if size > best:
+                best = size
+                best_rows = (rmin, rmax)
+    csk = 0; ctot = 0
+    for y in range(int(h * 0.25), int(h * 0.75)):
+        for x in range(int(w * 0.25), int(w * 0.75)):
+            ctot += 1
+            if skin[y * w + x]:
+                csk += 1
+    cy_mid = ((best_rows[0] + best_rows[1]) / 2.0 / h) if best_rows else 0.5
+    return {'dark': dark / float(tot), 'skin': sum(skin) / float(tot),
+            'blob': best / float(tot), 'central': csk / float(max(1, ctot)),
+            'blob_y': cy_mid}
+
+
 def extract_frames(video, outdir):
     subprocess.run(
         ['ffmpeg', '-y', '-i', video, '-vf', 'fps=1,scale=160:-2',
@@ -113,19 +186,22 @@ def main():
         frames = extract_frames(args.video, d)
         fr = []
         all_rules = {k: [] for k in ('D', 'Y', 'H', 'N', 'YH')}
+        feats = []
         for f in frames:
             frx = rule_fractions(Image.open(f))
             fr.append(frx[args.rule])
             for k, v in frx.items():
                 all_rules[k].append(v)
             print('frame %s: skin %.1f%%' % (os.path.basename(f), frx[args.rule] * 100))
+            feats.append(frame_features(Image.open(f)))
         if args.dump_stats:
             with open(args.dump_stats, 'w') as fh:
                 json.dump({'video': args.video, 'frames': len(fr), 'rule': args.rule,
                            'rules': all_rules,
                            'fractions': fr,
                            'max': max(fr) if fr else 0.0,
-                           'avg': (sum(fr) / len(fr)) if fr else 0.0}, fh)
+                           'avg': (sum(fr) / len(fr)) if fr else 0.0,
+                           'feat': feats}, fh)
         reason = reject_reason(fr)
         if reason:
             mx = max(fr) if fr else 0.0
