@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Visual frame gate: skin-pixel analysis to catch adult/NSFW visual content.
-Extracts 1 frame per second (160px wide) and computes the fraction of skin-cluster
-pixels per frame. Rejects if any frame is above the single-frame threshold, the
-average is above the avg threshold, or 3+ consecutive frames are above the
-consecutive threshold. Exits 0 on pass, 7 on rejection.
-Thresholds can be overridden via env: VISION_SINGLE, VISION_AVG, VISION_CONSEC.
+Extracts 1 frame per second (160px wide) and computes the fraction of
+skin-cluster pixels per frame under several detection rules (the raw clip's
+club/night lighting defeats naive daylight RGB, so multiple rules are used).
+Default rule: YH (YCbCr skin cluster OR HSV skin hue) -- chosen empirically so
+known strip-club footage is rejected and clean gameplay passes.
+Rejects if any frame exceeds the single-frame threshold, the average exceeds
+the avg threshold, or 3+ consecutive frames exceed the consecutive threshold.
+Exits 0 on pass, 7 on rejection. Thresholds/rule can be overridden via env:
+VISION_SINGLE, VISION_AVG, VISION_CONSEC, VISION_RULE.
 """
 import argparse
 import glob
@@ -20,19 +24,56 @@ SINGLE = float(os.environ.get('VISION_SINGLE', '0.30'))
 AVG = float(os.environ.get('VISION_AVG', '0.15'))
 CONSEC = float(os.environ.get('VISION_CONSEC', '0.20'))
 CONSEC_N = 3
+RULE = os.environ.get('VISION_RULE', 'YH')
 
 
-def skin_fraction(img):
+def rule_fractions(img):
     im = img.convert('RGB')
-    total = 0
-    skin = 0
+    d = y = h = n = yh = 0
+    tot = 0
     for r, g, b in im.getdata():
-        total += 1
-        if (r > 95 and g > 40 and b > 20
-                and max(r, g, b) - min(r, g, b) > 15
+        tot += 1
+        mx = max(r, g, b)
+        mn = min(r, g, b)
+        # D: classic uniform daylight RGB skin rule
+        if (r > 95 and g > 40 and b > 20 and mx - mn > 15
                 and abs(r - g) > 15 and r > g and r > b):
-            skin += 1
-    return (skin / total) if total else 0.0
+            d += 1
+        # Y: YCbCr (BT.601) skin cluster
+        cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b
+        cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
+        yb = (77 <= cb <= 127) and (133 <= cr <= 173)
+        if yb:
+            y += 1
+        # H: HSV skin hue range (incl. deep red/pink wrap-around)
+        v = mx / 255.0
+        s = 0.0 if mx == 0 else (mx - mn) / float(mx)
+        hsv = False
+        if v > 0.15 and 0.1 <= s <= 0.75:
+            if mx != mn:
+                if mx == r:
+                    hue = 60.0 * (((g - b) / float(mx - mn)) % 6)
+                elif mx == g:
+                    hue = 60.0 * ((b - r) / float(mx - mn) + 2)
+                else:
+                    hue = 60.0 * ((r - g) / float(mx - mn) + 4)
+            else:
+                hue = 0.0
+            if hue <= 50 or hue >= 340:
+                hsv = True
+        if hsv:
+            h += 1
+        # N: normalized chromaticity (illumination-independent rg)
+        s3 = r + g + b
+        if s3 > 0:
+            rr = r / float(s3)
+            gg = g / float(s3)
+            if 0.33 <= rr <= 0.55 and 0.22 <= gg <= 0.38 and r > g and r > b:
+                n += 1
+        if yb or hsv:
+            yh += 1
+    t = float(tot) if tot else 1.0
+    return {'D': d / t, 'Y': y / t, 'H': h / t, 'N': n / t, 'YH': yh / t}
 
 
 def extract_frames(video, outdir):
@@ -64,18 +105,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('video')
     ap.add_argument('--dump-stats', dest='dump_stats', default=None)
+    ap.add_argument('--rule', default=RULE,
+                    help='D (daylight RGB), Y (YCbCr), H (HSV), N (chromaticity), YH (Y or H)')
     args = ap.parse_args()
     d = tempfile.mkdtemp(prefix='vframes_')
     try:
         frames = extract_frames(args.video, d)
         fr = []
+        all_rules = {k: [] for k in ('D', 'Y', 'H', 'N', 'YH')}
         for f in frames:
-            s = skin_fraction(Image.open(f))
-            fr.append(s)
-            print('frame %s: skin %.1f%%' % (os.path.basename(f), s * 100))
+            frx = rule_fractions(Image.open(f))
+            fr.append(frx[args.rule])
+            for k, v in frx.items():
+                all_rules[k].append(v)
+            print('frame %s: skin %.1f%%' % (os.path.basename(f), frx[args.rule] * 100))
         if args.dump_stats:
             with open(args.dump_stats, 'w') as fh:
-                json.dump({'video': args.video, 'frames': len(fr),
+                json.dump({'video': args.video, 'frames': len(fr), 'rule': args.rule,
+                           'rules': all_rules,
                            'fractions': fr,
                            'max': max(fr) if fr else 0.0,
                            'avg': (sum(fr) / len(fr)) if fr else 0.0}, fh)
