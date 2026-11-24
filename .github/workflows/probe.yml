@@ -30,4 +30,9 @@ jobs:
           which ffmpeg || sudo apt-get install -y -qq ffmpeg
           sudo apt-get install -y -qq fonts-liberation
           pip install -q faster-whisper yt-dlp
-      - run: echo hello
+      - name: Render
+        env:
+          CLIP_URL: ${{ inputs.clip_url }}
+          TITLE: ${{ inputs.title }}
+          CREDIT: ${{ inputs.credit }}
+        run: bash render.sh
