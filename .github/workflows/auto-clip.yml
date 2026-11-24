@@ -12,7 +12,7 @@ jobs:
     env:
       TWITCH_CLIENT_ID: dyys9anz9uaayb45wnld000ne5l7bm
       TWITCH_SECRET: yr0m6ju2yu597ep4lxp3w4jx4bvly7
-      WEBHOOK_URL: https://cloud.activepieces.com/api/v1/webhooks/GKLser6YYAfdi6dtczbOs
+      WEBHOOK_URL: https://cloud.activepieces.com/api/v1/webhooks/hTUiU1jZ4JzQtxPWkc5WK
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: pranavkumar4645-web/gta6-clip-factory
     steps:
