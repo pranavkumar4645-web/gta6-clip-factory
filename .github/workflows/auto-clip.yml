@@ -30,7 +30,7 @@ jobs:
           EMOJI = re.compile('[' + chr(0x1F000) + '-' + chr(0x1FAFF) + chr(0x2600) + '-' + chr(0x27BF) + chr(0x1F1E6) + '-' + chr(0x1F1FF) + chr(0x2190) + '-' + chr(0x21FF) + chr(0x2B00) + '-' + chr(0x2BFF) + chr(0xFE0F) + chr(0x200D) + ']')
           cands = []
           for c in clips:
-              if f"clip-{c['id']}" in done:
+              if f"clip-{c['id'].rstrip('-')}" in done:
                   continue
               if BL.search(c.get('title') or '') or BL.search(c.get('broadcaster_name') or ''):
                   continue
