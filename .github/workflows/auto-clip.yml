@@ -101,7 +101,7 @@ jobs:
           sys.exit(1)
           EOF
           source chosen.env
-          bash render.sh
+          ls -la out.mp4 frame.jpg
       - name: Publish release
         id: release
         if: env.CLIP_ID != ''
