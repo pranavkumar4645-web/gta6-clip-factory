@@ -1,6 +1,5 @@
----
 name: Render GTA 6 clip
-on:
+"on":
   workflow_dispatch:
     inputs:
       clip_url:
