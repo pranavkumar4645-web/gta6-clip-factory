@@ -27,7 +27,7 @@ jobs:
           clips = json.load(open('clips.json')).get('data', [])
           done = {t.get('tagName','') for t in json.load(open('tags.json'))}
           BL = re.compile(r'nude|naked|nsfw|porn|sex|sexy|sexual|strip|onlyfans|horny|erotic|gore|beheading|decapitat', re.I)
-          EMOJI = re.compile('[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\U00002190-\U000021FF\U00002B00-\U00002BFF\U0000FE00-\U0000FE0F]')
+          EMOJI = re.compile('[' + chr(0x1F000) + '-' + chr(0x1FAFF) + chr(0x2600) + '-' + chr(0x27BF) + chr(0x1F1E6) + '-' + chr(0x1F1FF) + chr(0x2190) + '-' + chr(0x21FF) + chr(0x2B00) + '-' + chr(0x2BFF) + chr(0xFE0F) + chr(0x200D) + ']')
           cands = []
           for c in clips:
               if f"clip-{c['id']}" in done:
