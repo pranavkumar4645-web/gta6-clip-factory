@@ -24,7 +24,7 @@ jobs:
           curl -sL --fail -o clix.mp4 "https://github.com/pranavkumar4645-web/gta6-clip-factory/releases/download/clip-UnusualMoistSharkBIRB-Wlz2wmgaTOQAniKu/out.mp4"
           python3 vision_check.py --dump-stats statsB.json clix.mp4 || true
           python3 vision_check.py clix.mp4 && echo "TEST_B_PASSED_AS_EXPECTED" || echo "TEST_B_WRONGLY_REJECTED"
-      - name: Threshold sweep
+      - name: Rule and threshold sweep
         run: |
           python3 - <<'EOF'
           import json
@@ -39,15 +39,17 @@ jobs:
               return False
           a = json.load(open('statsA.json'))
           b = json.load(open('statsB.json'))
-          print('Mandy: frames=%d max=%.3f avg=%.3f' % (a['frames'], a['max'], a['avg']))
-          print('Clix: frames=%d max=%.3f avg=%.3f' % (b['frames'], b['max'], b['avg']))
-          for single in (0.30, 0.25, 0.20, 0.15):
-              for avg in (0.15, 0.12, 0.10, 0.08):
-                  for consec in (0.20, 0.15, 0.12):
-                      ra = verdict(a['fractions'], single, avg, consec)
-                      rb = verdict(b['fractions'], single, avg, consec)
-                      ok = 'OK' if ra and not rb else 'BAD'
-                      print('single=%.2f avg=%.2f consec=%.2f -> A_reject=%s B_reject=%s %s' % (single, avg, consec, ra, rb, ok))
+          for rule in sorted(a['rules']):
+              fa, fb = a['rules'][rule], b['rules'][rule]
+              print('%s: A frames=%d max=%.3f avg=%.3f | B frames=%d max=%.3f avg=%.3f'
+                    % (rule, len(fa), max(fa), sum(fa)/len(fa), len(fb), max(fb), sum(fb)/len(fb)))
+          combos = [(0.30,0.15,0.20),(0.25,0.15,0.20),(0.25,0.10,0.20),(0.20,0.10,0.15),(0.20,0.08,0.12),(0.15,0.08,0.12),(0.15,0.06,0.10),(0.12,0.05,0.08),(0.10,0.05,0.08)]
+          for rule in sorted(a['rules']):
+              for (s, av, c) in combos:
+                  ra = verdict(a['rules'][rule], s, av, c)
+                  rb = verdict(b['rules'][rule], s, av, c)
+                  print('rule=%s single=%.2f avg=%.2f consec=%.2f -> A_reject=%s B_reject=%s %s'
+                        % (rule, s, av, c, ra, rb, 'OK' if ra and not rb else 'BAD'))
           EOF
       - name: Test C - scout scoring on live top 100
         env:
