@@ -50,7 +50,7 @@ jobs:
           if not title:
               title = 'GTA 6 funny moment'
           with open(os.environ['GITHUB_ENV'], 'a') as env:
-              env.write(f"CLIP_ID={best['id']}\n")
+              env.write(f"CLIP_ID={best['id'].rstrip('-')}\n")
               env.write(f"CLIP_URL={best['url']}\n")
               env.write(f"TITLE={title}\n")
               env.write(f"CREDIT=@{best['broadcaster_name']}\n")
