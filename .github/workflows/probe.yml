@@ -36,3 +36,7 @@ jobs:
           TITLE: ${{ inputs.title }}
           CREDIT: ${{ inputs.credit }}
         run: bash render.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "clip-${GITHUB_RUN_ID}" out.mp4 frame.jpg --title "clip-${GITHUB_RUN_ID}" --notes "TITLE: ${TITLE} | CREDIT: ${CREDIT}" --target main || echo "release step failed"
