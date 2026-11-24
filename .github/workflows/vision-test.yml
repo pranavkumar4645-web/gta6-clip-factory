@@ -41,15 +41,28 @@ jobs:
           b = json.load(open('statsB.json'))
           for rule in sorted(a['rules']):
               fa, fb = a['rules'][rule], b['rules'][rule]
-              print('%s: A frames=%d max=%.3f avg=%.3f | B frames=%d max=%.3f avg=%.3f'
-                    % (rule, len(fa), max(fa), sum(fa)/len(fa), len(fb), max(fb), sum(fb)/len(fb)))
-          combos = [(0.30,0.15,0.20),(0.25,0.15,0.20),(0.25,0.10,0.20),(0.20,0.10,0.15),(0.20,0.08,0.12),(0.15,0.08,0.12),(0.15,0.06,0.10),(0.12,0.05,0.08),(0.10,0.05,0.08)]
-          for rule in sorted(a['rules']):
-              for (s, av, c) in combos:
-                  ra = verdict(a['rules'][rule], s, av, c)
-                  rb = verdict(b['rules'][rule], s, av, c)
-                  print('rule=%s single=%.2f avg=%.2f consec=%.2f -> A_reject=%s B_reject=%s %s'
-                        % (rule, s, av, c, ra, rb, 'OK' if ra and not rb else 'BAD'))
+              print('%s: A max=%.3f avg=%.3f | B max=%.3f avg=%.3f'
+                    % (rule, max(fa), sum(fa)/len(fa), max(fb), sum(fb)/len(fb)))
+          for tag, st in (('A', a), ('B', b)):
+              fs = st['feat']
+              print('%s frames=%d dark[%.2f-%.2f] skin[%.2f-%.2f] blob[%.2f-%.2f] central[%.2f-%.2f] blob_y[%.2f-%.2f]'
+                    % (tag, len(fs), min(f['dark'] for f in fs), max(f['dark'] for f in fs),
+                       min(f['skin'] for f in fs), max(f['skin'] for f in fs),
+                       min(f['blob'] for f in fs), max(f['blob'] for f in fs),
+                       min(f['central'] for f in fs), max(f['central'] for f in fs),
+                       min(f['blob_y'] for f in fs), max(f['blob_y'] for f in fs)))
+          print('A per-frame (dark, skin, blob, central, blob_y):')
+          for f in a['feat']:
+              print('  %.3f %.3f %.3f %.3f %.3f' % (f['dark'], f['skin'], f['blob'], f['central'], f['blob_y']))
+          print('B per-frame (dark, skin, blob, central, blob_y):')
+          for f in b['feat']:
+              print('  %.3f %.3f %.3f %.3f %.3f' % (f['dark'], f['skin'], f['blob'], f['central'], f['blob_y']))
+          # candidate spatial gate: dark scene + body-sized blob in frame
+          for (blo, bhi) in ((0.03, 0.30), (0.05, 0.35), (0.04, 0.32)):
+              ra = sum(1 for f in a['feat'] if f['dark'] > 0.5 and blo < f['blob'] < bhi)
+              rb = sum(1 for f in b['feat'] if f['dark'] > 0.5 and blo < f['blob'] < bhi)
+              print('spatial gate blob in (%.2f,%.2f) & dark>0.5: A frames tripping=%d B frames tripping=%d %s'
+                    % (blo, bhi, ra, rb, 'OK' if ra >= 3 and rb == 0 else 'BAD'))
           EOF
       - name: Test C - scout scoring on live top 100
         env:
