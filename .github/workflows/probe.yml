@@ -1,6 +1,18 @@
 name: probe
 on:
   workflow_dispatch:
+    inputs:
+      clip_url:
+        description: Twitch clip URL
+        required: true
+      title:
+        description: Caption text
+        required: false
+        default: 'none'
+      credit:
+        description: Streamer credit
+        required: false
+        default: 'none'
 jobs:
   ok:
     runs-on: ubuntu-latest
