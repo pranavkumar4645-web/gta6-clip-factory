@@ -33,7 +33,7 @@ jobs:
         run: |
           which ffmpeg || sudo apt-get install -y -qq ffmpeg
           sudo apt-get install -y -qq fonts-liberation
-          pip install -q faster-whisper yt-dlp
+          pip install -q faster-whisper yt-dlp pillow
       - name: Render
         run: bash render.sh
       - name: Publish release
