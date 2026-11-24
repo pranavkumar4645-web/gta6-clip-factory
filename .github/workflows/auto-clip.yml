@@ -26,51 +26,71 @@ jobs:
           import json, re, sys, os
           clips = json.load(open('clips.json')).get('data', [])
           done = {t.get('tagName','') for t in json.load(open('tags.json'))}
-          BL = re.compile(r'nude|naked|nsfw|porn|sex|sexy|sexual|strip|onlyfans|horny|erotic|gore|beheading|decapitat', re.I)
+          BL = re.compile('nude|naked|nsfw|porn|sex|sexy|sexual|strip|onlyfans|horny|erotic|gore|beheading|decapitat', re.I)
           EMOJI = re.compile('[' + chr(0x1F000) + '-' + chr(0x1FAFF) + chr(0x2600) + '-' + chr(0x27BF) + chr(0x1F1E6) + '-' + chr(0x1F1FF) + chr(0x2190) + '-' + chr(0x21FF) + chr(0x2B00) + '-' + chr(0x2BFF) + chr(0xFE0F) + chr(0x200D) + ']')
           cands = []
           for c in clips:
-              if f"clip-{c['id'].rstrip('-')}" in done:
+              cid = c['id'].rstrip('-')
+              if 'clip-' + cid in done:
                   continue
               if BL.search(c.get('title') or '') or BL.search(c.get('broadcaster_name') or ''):
                   continue
               d = c.get('duration') or 0
               if d < 15 or d > 180:
                   continue
-              cands.append(c)
-          if not cands:
-              print("::error::no suitable clip")
-              sys.exit(1)
-          best = max(cands, key=lambda c: c.get('view_count', 0))
-          title = re.sub(r'#\w+', '', best.get('title') or '')
+          title = re.sub(r'#\w+', '', c.get('title') or '')
           title = EMOJI.sub('', title)
           title = BL.sub('', title)
-          title = re.sub(r'\s+', ' ', title).strip().strip('|:-–— ')
-          title = title[:60].strip()
-          if not title:
-              title = 'GTA 6 funny moment'
+          title = re.sub(r'\s+', ' ', title).strip().strip('|:-\u2013\u2014 '));
+          title = title[:60].strip() or 'GTA 6 funny moment'
+          cands.append({'id': cid, 'title': title, 'credit': '@' + c['broadcaster_name'], 'views': c.get('view_count', 0)})
+          cands.sort(key=lambda x: -x['views'])
+          top = cands[:5]
+          if not top:
+              print('::error::no suitable clip')
+              sys.exit(1)
           with open(os.environ['GITHUB_ENV'], 'a') as env:
-              env.write(f"CLIP_ID={best['id'].rstrip('-')}\n")
-              env.write(f"CLIP_URL={best['url']}\n")
-              env.write(f"TITLE={title}\n")
-              env.write(f"CREDIT=@{best['broadcaster_name']}\n")
-          print(f"Picked clip {best['id']} '{title}' views={best.get('view_count')} by {best['broadcaster_name']}")
+              env.write('CANDIDATES<<__EOF__' + chr(10))
+              env.write(json.dumps(top) + chr(10))
+              env.write('__EOF__' + chr(10))
+          for c in top:
+              print('Candidate:', c['id'], '|', c['title'], '|', c['credit'], '| views', c['views'])
           EOF
       - uses: actions/checkout@v4
-        if: env.CLIP_ID != ''
+        if: env.CANDIDATES != ''
       - uses: actions/setup-python@v5
-        if: env.CLIP_ID != ''
+        if: env.CANDIDATES != ''
         with:
           python-version: '3.11'
       - name: Install tools
-        if: env.CLIP_ID != ''
+        if: env.CANDIDATES != ''
         run: |
           which ffmpeg || sudo apt-get install -y -qq ffmpeg
           sudo apt-get install -y -qq fonts-liberation
           pip install -q faster-whisper yt-dlp
       - name: Render
-        if: env.CLIP_ID != ''
+        if: env.CANDIDATES != ''
         run: |
+          python3 - <<'EOF'
+          import json, os, shlex, subprocess, sys
+          cands = json.loads(os.environ['CANDIDATES'])
+          for c in cands:
+              if os.path.exists('source.mp4'):
+                  os.remove('source.mp4')
+              r = subprocess.run(['yt-dlp','-o','source.mp4','https://clips.twitch.tv/' + c['id']])
+              if r.returncode == 0 and os.path.exists('source.mp4') and os.path.getsize('source.mp4') > 0:
+                  lines = ['CLIP_ID=' + c['id'], 'TITLE=' + c['title'], 'CREDIT=' + c['credit']]
+                  with open('chosen.env','w') as f:
+                      f.write(chr(10).join('CLIP_ID=' + shlex.quote(c['id']), 'TITLE=' + shlex.quote(c['title']), 'CREDIT=' + shlex.quote(c['credit'])))
+                  with open(os.environ['GITHUB_ENV'],'a') as f:
+                      for l in lines:
+                          f.write(l + chr(10))
+                  print('Chosen clip', c['id'], '|', c['title'], '|', c['credit'])
+                  sys.exit(0)
+          print('::error::no downloadable clip')
+          sys.exit(1)
+          EOF
+          source chosen.env
           export CLIP_URL="https://clips.twitch.tv/${CLIP_ID}"
           bash render.sh
       - name: Publish release
