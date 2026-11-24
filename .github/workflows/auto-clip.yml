@@ -22,7 +22,6 @@ jobs:
           TOKEN=$(curl -s -X POST "https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_SECRET}&grant_type=client_credentials" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
           curl -s -H "Client-Id: ${TWITCH_CLIENT_ID}" -H "Authorization: Bearer ${TOKEN}" "https://api.twitch.tv/helix/clips?game_id=1867279146&first=30" > clips.json
           gh release list --limit 200 --json tagName > tags.json 2>/dev/null || echo '[]' > tags.json
-          python3 - <<'EOF'
           import json, re, sys, os
           clips = json.load(open('clips.json')).get('data', [])
           done = {t.get('tagName','') for t in json.load(open('tags.json'))}
